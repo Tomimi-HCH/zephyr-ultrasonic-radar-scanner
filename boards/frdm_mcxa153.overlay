@@ -1,0 +1,102 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Tomimi
+
+#include <nxp/mcx/MCXA153VLH-pinctrl.h>
+
+&pinctrl {
+	pinmux_flexpwm0_pwm1: pinmux_flexpwm0_pwm1 {
+		group0 {
+			pinmux = <PWM0_B1_P3_9>;
+			slew-rate = "fast";
+			drive-strength = "low";
+		};
+	};
+};
+
+/ {
+	chosen {
+		zephyr,display = &st7735;
+	};
+
+	aliases {
+		sonar-trig    = &sonar_trig_pin;
+		sonar-echo    = &sonar_echo_pin;
+		servo-pwm     = &servo_node;
+		lcd-backlight = &lcd_blk_pin;
+		font-cs      = &font_cs_pin;
+		/* Product control is the board's SW3, named user_button_3 in the BSP. */
+		sw0           = &user_button_3;
+		/* SW2 doubles as the ISP entry button; safe to sample as GPIO at runtime. */
+		range-btn     = &user_button_2;
+	};
+
+	app_gpio_pins {
+		compatible = "gpio-leds";
+		sonar_trig_pin: sonar_trig {
+			gpios = <&gpio3 28 GPIO_ACTIVE_HIGH>;
+			label = "HC-SR04 Trig Pin";
+		};
+		sonar_echo_pin: sonar_echo {
+			gpios = <&gpio3 27 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>;
+			label = "HC-SR04 Echo Pin";
+		};
+		lcd_blk_pin: lcd_blk {
+			gpios = <&gpio3 1 GPIO_ACTIVE_HIGH>;
+			label = "LCD Backlight Pin";
+		};
+		/* LCD and font ROM share the physical CS line. High selects the ROM. */
+		font_cs_pin: font_cs {
+			gpios = <&gpio1 3 GPIO_ACTIVE_HIGH>;
+			label = "Font ROM CS Pin";
+		};
+	};
+
+	servo_dev {
+		compatible = "pwm-leds";
+		servo_node: servo_0 {
+			pwms = <&flexpwm0_pwm1 1 20000000 0>; /* 50Hz, 20ms, PWM0_B1_P3_9 */
+		};
+	};
+
+	mipi_dbi {
+		compatible = "zephyr,mipi-dbi-spi";
+		spi-dev = <&lpspi0>;
+		dc-gpios = <&gpio3 30 GPIO_ACTIVE_HIGH>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		st7735: st7735r@0 {
+			compatible = "sitronix,st7735r";
+			reg = <0>;
+			mipi-max-frequency = <8000000>; /* 杜邦线环境下 15MHz 边沿振铃会花屏，8MHz 足够 */
+			mipi-mode = "MIPI_DBI_MODE_SPI_4WIRE";
+			width = <160>;
+			height = <128>;
+			x-offset = <0>;
+			y-offset = <0>;
+			madctl = <0x60>;
+			colmod = <0x55>;
+			invctr = <0>;
+			inversion-on; /* 这块 1.8" 屏需要反显，缺省 INV_OFF 会整屏花/发白 */
+			pwctr1 = [a2 02 84];
+			pwctr2 = [c5];
+			pwctr3 = [0a 00];
+			pwctr4 = [8a 2a];
+			pwctr5 = [8a ee];
+			vmctr1 = <0x0e>;
+			gamctrp1 = [0f 1a 0f 18 2f 28 20 22 1f 1b 23 37 00 07 02 10];
+			gamctrn1 = [0f 1b 0f 17 33 2c 29 2e 30 30 39 3f 00 07 03 10];
+		};
+	};
+};
+
+&lpspi0 {
+	status = "okay";
+	cs-gpios = <&gpio1 3 GPIO_ACTIVE_LOW>;
+};
+
+&flexpwm0_pwm1 {
+	status = "okay";
+	pinctrl-0 = <&pinmux_flexpwm0_pwm1>;
+	pinctrl-names = "default";
+};
